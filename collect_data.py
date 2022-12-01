@@ -5,7 +5,18 @@ Generates the prompts and collects the model's responses.
 We always list the larger number first.
 """
 
+import os
+import csv
 from abc import ABC, abstractmethod
+
+import openai
+from openai.error import RateLimitError
+from tqdm import tqdm
+import backoff
+
+START_MULTIPLICAND = 0
+MAX_MULTIPLICAND = 50
+OUTPUT_FILENAME = './data/multiplication_data_0_100_v1.csv'
 
 
 class Prompter(ABC):
@@ -33,7 +44,7 @@ class Answerer(ABC):
     """Answers multiplication prompts."""
 
     @abstractmethod
-    def __call__(self, prompts: list[str]) -> list[int | None]:
+    def __call__(self, prompts: list[str]) -> list[str | None]:
         """
         Answer a list of prompt strings, returning a list of answers to each prompt as ints.
 
@@ -45,8 +56,38 @@ class Answerer(ABC):
 class StubAnswerer(Answerer):
     """Output canned answers for testing."""
 
-    def __call__(self, prompts: list[str]) -> list[int]:
-        return [66] * len(prompts)
+    def __call__(self, prompts: list[str]) -> list[str]:
+        return ['66'] * len(prompts)
+
+
+class GPT3Answerer(Answerer):
+    def __init__(self, model='text-davinci-003'):
+        self.model = model
+
+    @backoff.on_exception(backoff.expo, RateLimitError)
+    def completions_with_backoff(self, **kwargs):
+        """https://help.openai.com/en/articles/5955604-how-can-i-solve-429-too-many-requests-errors"""
+        response = openai.Completion.create(**kwargs)
+        return response
+
+    def __call__(self, prompts: list[str]) -> list[str | None]:
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+
+        output = []
+        try:
+            for i in tqdm(range(0, len(prompts), 20)):
+                batch = prompts[i:i+20]
+                completion = openai.Completion.create(
+                    model=self.model,
+                    prompt=batch,
+                    max_tokens=6,
+                    temperature=0,
+                    stop='\n'
+                )
+                output += [choice.text.strip() for choice in completion['choices']]  # type: ignore
+        except Exception as e:
+            print(e)
+        return output
 
 
 if __name__ == '__main__':
@@ -55,13 +96,14 @@ if __name__ == '__main__':
     prompts = []
     prompter = TwoShotPrompter()
 
-    for a in range(0, 100):
+    for a in range(START_MULTIPLICAND, MAX_MULTIPLICAND):
         for b in range(0, a + 1):  # a >= b
             multiplicand_tuples.append((a, b))
             prompts.append(prompter(a, b))
 
     # Generate some answers
-    answerer = StubAnswerer()
+    # answerer = StubAnswerer()
+    answerer = GPT3Answerer()
     answers = answerer(prompts)
 
     # Print the results
@@ -71,3 +113,10 @@ if __name__ == '__main__':
 
     num_answered = len([answer for answer in answers if answer is not None])
     print(f'Generated {len(prompts)} prompts and successfully got {num_answered} answers.')
+
+    # Write results as CSV
+    with open(OUTPUT_FILENAME, 'w', newline='\n') as f:
+        writer = csv.writer(f)
+        writer.writerow(['a', 'b', 'completion'])
+        for multiplicand_tuple, answer in zip(multiplicand_tuples, answers):
+            writer.writerow([multiplicand_tuple[0], multiplicand_tuple[1], answer])
