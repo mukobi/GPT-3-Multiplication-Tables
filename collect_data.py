@@ -17,8 +17,8 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 START_MULTIPLICAND = 0
-STOP_MULTIPLICAND = 1000
-OUTPUT_FILENAME = f'./data/multiplication_data_gpt2_v1_{START_MULTIPLICAND}_{STOP_MULTIPLICAND}.csv'
+STOP_MULTIPLICAND = 100
+OUTPUT_FILENAME = f'./data/multiplication_data_gptneo1,3_v2_{START_MULTIPLICAND}_{STOP_MULTIPLICAND}.csv'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
@@ -63,7 +63,7 @@ class StubAnswerer(Answerer):
         return ['66'] * len(prompts)
 
 
-class GPT3Answerer(Answerer):
+class GPT3APIAnswerer(Answerer):
     def __init__(self, model_name='text-davinci-003'):
         self.model_name = model_name
 
@@ -93,7 +93,7 @@ class GPT3Answerer(Answerer):
         return output
 
 
-class GPT2Answerer(Answerer):
+class HFTransformersAnswerer(Answerer):
     def __init__(self, model_name='gpt2', batch_size=128):
         self.model_name = model_name
         self.batch_size = batch_size
@@ -137,10 +137,14 @@ if __name__ == '__main__':
             multiplicand_tuples.append((a, b))
             prompts.append(prompter(a, b))
 
-    # Generate some answers
+    # Choose a model with which to answer
     # answerer = StubAnswerer()
-    # answerer = GPT3Answerer()
-    answerer = GPT2Answerer()
+    # answerer = GPT3APIAnswerer()
+    # answerer = HFTransformersAnswerer()
+    # answerer = HFTransformersAnswerer('EleutherAI/gpt-j-6B')
+    answerer = HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16)
+
+    # Generate some answers
     answers = answerer(prompts)
 
     # Print the results
