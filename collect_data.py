@@ -9,14 +9,17 @@ import os
 import csv
 from abc import ABC, abstractmethod
 
+from tqdm import tqdm
 import openai
 from openai.error import RateLimitError
-from tqdm import tqdm
 import backoff
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 START_MULTIPLICAND = 0
-MAX_MULTIPLICAND = 50
-OUTPUT_FILENAME = './data/multiplication_data_0_100_v1.csv'
+STOP_MULTIPLICAND = 1000
+OUTPUT_FILENAME = f'./data/multiplication_data_gpt2_v1_{START_MULTIPLICAND}_{STOP_MULTIPLICAND}.csv'
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 class Prompter(ABC):
@@ -32,7 +35,7 @@ class TwoShotPrompter(Prompter):
 
     def __init__(self, examples: str = ''):
         if examples == '':
-            self.examples = '65 * 44 = 2860\n98 * 23 = 2254\n'  # Randomly chosen default
+            self.examples = '7 * 6 = 42\n65 * 44 = 2860\n98 * 23 = 2254\n'  # Randomly chosen default
         else:
             self.examples = examples
 
@@ -61,8 +64,8 @@ class StubAnswerer(Answerer):
 
 
 class GPT3Answerer(Answerer):
-    def __init__(self, model='text-davinci-003'):
-        self.model = model
+    def __init__(self, model_name='text-davinci-003'):
+        self.model_name = model_name
 
     @backoff.on_exception(backoff.expo, RateLimitError)
     def completions_with_backoff(self, **kwargs):
@@ -78,7 +81,7 @@ class GPT3Answerer(Answerer):
             for i in tqdm(range(0, len(prompts), 20)):
                 batch = prompts[i:i+20]
                 completion = openai.Completion.create(
-                    model=self.model,
+                    model=self.model_name,
                     prompt=batch,
                     max_tokens=6,
                     temperature=0,
@@ -90,20 +93,54 @@ class GPT3Answerer(Answerer):
         return output
 
 
+class GPT2Answerer(Answerer):
+    def __init__(self, model_name='gpt2', batch_size=128):
+        self.model_name = model_name
+        self.batch_size = batch_size
+        self.model = AutoModelForCausalLM.from_pretrained(model_name).to(DEVICE)
+        self.model.eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.eos_token = self.tokenizer('\n').input_ids[0]
+        self.tokenizer.pad_token = self.eos_token
+
+    def __call__(self, prompts: list[str]) -> list[str | None]:
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+
+        output = []
+        for i in tqdm(range(0, len(prompts), self.batch_size)):
+            batch = prompts[i:i+self.batch_size]
+            tokenized = self.tokenizer(batch, padding=True, return_tensors='pt')
+            input_ids = tokenized.input_ids.to(DEVICE)
+            attention_mask = tokenized.attention_mask.to(DEVICE)
+            generated = self.model.generate(
+                inputs=input_ids,
+                attention_mask=attention_mask,
+                max_new_tokens=8,
+                temperature=0.0,
+                pad_token_id=self.eos_token,
+                eos_token_id=self.eos_token,
+            )
+            only_new_tokens = generated[:, tokenized.input_ids[0].shape[0]:]
+            decoded_completions = self.tokenizer.batch_decode(only_new_tokens)
+            output += [completion.strip() for completion in decoded_completions]
+        return output
+
+
 if __name__ == '__main__':
     # Generate numbers and prompts
     multiplicand_tuples = []
     prompts = []
     prompter = TwoShotPrompter()
 
-    for a in range(START_MULTIPLICAND, MAX_MULTIPLICAND):
+    for a in range(START_MULTIPLICAND, STOP_MULTIPLICAND):
         for b in range(0, a + 1):  # a >= b
             multiplicand_tuples.append((a, b))
             prompts.append(prompter(a, b))
 
     # Generate some answers
     # answerer = StubAnswerer()
-    answerer = GPT3Answerer()
+    # answerer = GPT3Answerer()
+    answerer = GPT2Answerer()
     answers = answerer(prompts)
 
     # Print the results
