@@ -35,7 +35,7 @@ class TwoShotPrompter(Prompter):
 
     def __init__(self, examples: str = ''):
         if examples == '':
-            self.examples = '7 * 6 = 42\n65 * 44 = 2860\n98 * 23 = 2254\n'  # Randomly chosen default
+            self.examples = 'Multiply:\n7 * 6 = 42\n65 * 44 = 2860\n98 * 23 = 2254\n'  # Randomly chosen default
         else:
             self.examples = examples
 
