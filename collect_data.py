@@ -160,21 +160,21 @@ if __name__ == '__main__':
     print('Generating prompts...')
     for a in range(START_MULTIPLICAND, STOP_MULTIPLICAND):
         # for b in range(START_MULTIPLICAND, a + 1):  # a >= b
-        for b in range(START_MULTIPLICAND, STOP_MULTIPLICAND):  # a not necessarily >= b
+        for b in range(0, STOP_MULTIPLICAND):  # a not necessarily >= b
             multiplicand_tuples.append((a, b))
             prompts.append(prompter(a, b))
 
     # Choose a model with which to answer
     for answerer in [
-        StubAnswerer(),  # For testing, always outputs a constant
-        HFTransformersAnswerer('gpt2'),  # 117M
-        HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16),  # 1.3B
+        # StubAnswerer(),  # For testing, always outputs a constant
+        # HFTransformersAnswerer('gpt2'),  # 117M
+        # HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16),  # 1.3B
         # HFTransformersAnswerer('EleutherAI/gpt-j-6B'),  # 6B, not enough memory on my machine
         # See https://blog.eleuther.ai/gpt3-model-sizes/ for curie size estimate
-        GPT3APIAnswerer('text-ada-001'),  # ~350M
-        GPT3APIAnswerer('text-babbage-001'),  # ~1.3B
-        GPT3APIAnswerer('text-curie-001'),  # ~6.7B
-        GPT3APIAnswerer('text-davinci-003'),  # 175B
+        # GPT3APIAnswerer('text-ada-001'),  # ~350M
+        # GPT3APIAnswerer('text-babbage-001'),  # ~1.3B
+        # GPT3APIAnswerer('text-curie-001'),  # ~6.7B
+        # GPT3APIAnswerer('text-davinci-003'),  # 175B
     ]:
         # Generate some answers
         print(f'Generating answers with model {answerer}')
@@ -182,7 +182,7 @@ if __name__ == '__main__':
         answers = answerer(prompts)
         duration = time.time() - start_time
 
-        # Print the results
+        # Print the results for debugging
         # for multiplicand_tuple, answer in zip(multiplicand_tuples, answers):
         #     a, b = multiplicand_tuple
         #     print(f'{a} * {b} = {answer}')
