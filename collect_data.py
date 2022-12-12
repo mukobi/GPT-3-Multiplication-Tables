@@ -171,10 +171,10 @@ if __name__ == '__main__':
         HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16),  # 1.3B
         # HFTransformersAnswerer('EleutherAI/gpt-j-6B'),  # 6B, not enough memory on my machine
         # See https://blog.eleuther.ai/gpt3-model-sizes/ for curie size estimate
-        # GPT3APIAnswerer('text-ada-001'),  # ~350M
-        # GPT3APIAnswerer('text-babbage-001'),  # ~1.3B
-        # GPT3APIAnswerer('text-curie-001'),  # ~6.7B
-        # GPT3APIAnswerer('text-davinci-003'),  # 175B
+        GPT3APIAnswerer('text-ada-001'),  # ~350M
+        GPT3APIAnswerer('text-babbage-001'),  # ~1.3B
+        GPT3APIAnswerer('text-curie-001'),  # ~6.7B
+        GPT3APIAnswerer('text-davinci-003'),  # 175B
     ]:
         # Generate some answers
         print(f'Generating answers with model {answerer}')
