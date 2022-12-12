@@ -42,7 +42,7 @@ def plot_heatmap(filename):
             completion_numeric = re.sub('[^0-9]', '', row[2])
             completion = int(completion_numeric) if completion_numeric != '' else 0
             correct = a * b  # Calculate the correct solution by multiplying a and b
-            correctness_grid[b][a] = 1 if completion == correct else -1
+            correctness_grid[a][b] = 1 if completion == correct else -1
 
             # Calculate the number of digits that the completion is off by
             digits_off = abs(len(str(completion)) - len(str(correct)))
@@ -51,7 +51,7 @@ def plot_heatmap(filename):
             elif completion != correct:
                 digits_off += sum([1 for c1, c2 in zip(str(completion), str(correct)) if c1 != c2])
 
-            digits_off_grid[b][a] = digits_off
+            digits_off_grid[a][b] = digits_off
 
     # Create a correctness heatmap using matplotlib
     plt.clf()
@@ -59,6 +59,8 @@ def plot_heatmap(filename):
     plt.colorbar(label='Correctness')
     plt.xlabel('B')
     plt.ylabel('A')
+    plt.xticks(range(0, 100, 10))
+    plt.yticks(range(0, 100, 10))
     plt.title(f'{model_name}: A * B Correctness')
     plt.savefig(f'plots/correctness {model_name}.png')
     # plt.show()
