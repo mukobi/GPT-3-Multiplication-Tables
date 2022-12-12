@@ -14,6 +14,8 @@ import random
 
 random.seed(66)
 
+OUTPUT_FILE = 'data/prompt.csv'
+
 
 def generate_examples_rand_sample(n):
     output = ''
@@ -61,6 +63,15 @@ def generate_examples_spread_out_digits():
         line = f'{a} * {b} = {answer}'
         examples += line + r'\n'
     print(r'Multiply:\n' + examples)
+
+    # Write the examples to a file with headers a, b, completion
+    with open(OUTPUT_FILE, 'w') as f:
+        f.write('a,b,completion\n')
+        for i in range(0, len(groups), 2):
+            a, b = groups[i], groups[i + 1]
+            answer = a * b
+            line = f'{a},{b},{answer}'
+            f.write(line + '\n')
 
 
 if __name__ == '__main__':
