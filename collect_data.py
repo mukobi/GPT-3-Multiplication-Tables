@@ -6,6 +6,7 @@ We always list the larger number first.
 """
 
 import os
+import time
 import csv
 from abc import ABC, abstractmethod
 
@@ -17,7 +18,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 START_MULTIPLICAND = 0
-STOP_MULTIPLICAND = 10
+STOP_MULTIPLICAND = 100
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f'Using device: {DEVICE}')
 
@@ -100,7 +101,7 @@ class GPT3APIAnswerer(Answerer):
         try:
             for i in tqdm(range(0, len(prompts), 20)):
                 batch = prompts[i:i+20]
-                completion = openai.Completion.create(
+                completion = self.completions_with_backoff(
                     model=self.model_name,
                     prompt=batch,
                     max_tokens=6,
@@ -156,6 +157,7 @@ if __name__ == '__main__':
     prompts = []
     prompter = FewShotPrompter(FEW_SHOT_PROMPT)
 
+    print('Generating prompts...')
     for a in range(START_MULTIPLICAND, STOP_MULTIPLICAND):
         # for b in range(START_MULTIPLICAND, a + 1):  # a >= b
         for b in range(START_MULTIPLICAND, STOP_MULTIPLICAND):  # a not necessarily >= b
@@ -164,18 +166,21 @@ if __name__ == '__main__':
 
     # Choose a model with which to answer
     for answerer in [
-        # StubAnswerer(),  # For testing, always outputs a constant
-        # HFTransformersAnswerer('gpt2'),  # 117M
-        # HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16),  # 1.3B
+        StubAnswerer(),  # For testing, always outputs a constant
+        HFTransformersAnswerer('gpt2'),  # 117M
+        HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16),  # 1.3B
         # HFTransformersAnswerer('EleutherAI/gpt-j-6B'),  # 6B, not enough memory on my machine
         # See https://blog.eleuther.ai/gpt3-model-sizes/ for curie size estimate
-        GPT3APIAnswerer('text-ada-001'),  # ~350M
+        # GPT3APIAnswerer('text-ada-001'),  # ~350M
         # GPT3APIAnswerer('text-babbage-001'),  # ~1.3B
         # GPT3APIAnswerer('text-curie-001'),  # ~6.7B
         # GPT3APIAnswerer('text-davinci-003'),  # 175B
     ]:
         # Generate some answers
+        print(f'Generating answers with model {answerer}')
+        start_time = time.time()
         answers = answerer(prompts)
+        duration = time.time() - start_time
 
         # Print the results
         # for multiplicand_tuple, answer in zip(multiplicand_tuples, answers):
@@ -183,7 +188,7 @@ if __name__ == '__main__':
         #     print(f'{a} * {b} = {answer}')
 
         num_answered = len([answer for answer in answers if answer is not None])
-        print(f'{answerer}: Generated {len(prompts)} prompts and successfully got {num_answered} answers.')
+        print(f'{answerer}: Generated {len(prompts)} prompts and successfully got {num_answered} answers in {duration} seconds.')
 
         # Write results as CSV
         with open(get_output_filename(answerer), 'w', newline='\n') as f:
