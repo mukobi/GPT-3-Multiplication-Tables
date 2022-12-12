@@ -18,9 +18,16 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 START_MULTIPLICAND = 0
 STOP_MULTIPLICAND = 100
-OUTPUT_FILENAME = f'./data/multiplication_data_gptneo1,3_v2_{START_MULTIPLICAND}_{STOP_MULTIPLICAND}.csv'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+# See ./generate_prompt.py
+FEW_SHOT_PROMPT = 'Multiply:\n319 * 72 = 22968\n945 * 445 = 420525\n805 * 252 = 202860\n456 * 301 = 137256\n882 * 262 = 231084\n802 * 573 = 459546\n762 * 97 = 73914\n948 * 886 = 839928\n863 * 506 = 436678\n479 * 188 = 90052\n'
+
+def get_output_filename(model, suffix='') -> str:
+    """Return a filename for the output data."""
+    if suffix != '':
+        suffix = f'_{suffix}'
+    return f'./data/multiplication_data_{model}_{START_MULTIPLICAND}_{STOP_MULTIPLICAND}{suffix}.csv'
 
 class Prompter(ABC):
     """Given numbers to multiply, format them into a prompt."""
@@ -30,12 +37,12 @@ class Prompter(ABC):
         raise NotImplementedError
 
 
-class TwoShotPrompter(Prompter):
+class FewShotPrompter(Prompter):
     """2-shot example prompting to help our model learn the format."""
 
     def __init__(self, examples: str = ''):
         if examples == '':
-            self.examples = 'Multiply:\n7 * 6 = 42\n65 * 44 = 2860\n98 * 23 = 2254\n'  # Randomly chosen default
+            self.examples = 'Multiply:\n7 * 6 = 42\n65 * 44 = 2860\n98 * 23 = 2254\n'  # Randomly chosen 2-shot default
         else:
             self.examples = examples
 
@@ -130,7 +137,7 @@ if __name__ == '__main__':
     # Generate numbers and prompts
     multiplicand_tuples = []
     prompts = []
-    prompter = TwoShotPrompter()
+    prompter = FewShotPrompter(FEW_SHOT_PROMPT)
 
     for a in range(START_MULTIPLICAND, STOP_MULTIPLICAND):
         for b in range(0, a + 1):  # a >= b
@@ -141,8 +148,9 @@ if __name__ == '__main__':
     # answerer = StubAnswerer()
     # answerer = GPT3APIAnswerer()
     # answerer = HFTransformersAnswerer()
+    answerer = HFTransformersAnswerer('gpt-2')
     # answerer = HFTransformersAnswerer('EleutherAI/gpt-j-6B')
-    answerer = HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16)
+    # answerer = HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16)
 
     # Generate some answers
     answers = answerer(prompts)
@@ -156,7 +164,7 @@ if __name__ == '__main__':
     print(f'Generated {len(prompts)} prompts and successfully got {num_answered} answers.')
 
     # Write results as CSV
-    with open(OUTPUT_FILENAME, 'w', newline='\n') as f:
+    with open(get_output_filename(answerer), 'w', newline='\n') as f:
         writer = csv.writer(f)
         writer.writerow(['a', 'b', 'completion'])
         for multiplicand_tuple, answer in zip(multiplicand_tuples, answers):
