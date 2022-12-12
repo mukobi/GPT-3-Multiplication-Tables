@@ -23,7 +23,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f'Using device: {DEVICE}')
 
 # See ./generate_prompt.py
-FEW_SHOT_PROMPT = 'Multiply:\n14 * 10 = 140\n83 * 29 = 2407\n77 * 63 = 4851\n70 * 19 = 1330\n'
+FEW_SHOT_PROMPT = 'Multiply:\n41 * 70 = 2870\n23 * 6 = 138\n9 * 58 = 522\n'
 
 
 def get_output_filename(model, suffix='') -> str:
