@@ -17,17 +17,20 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 START_MULTIPLICAND = 0
-STOP_MULTIPLICAND = 100
+STOP_MULTIPLICAND = 300
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+print(f'Using device: {DEVICE}')
 
 # See ./generate_prompt.py
 FEW_SHOT_PROMPT = 'Multiply:\n319 * 72 = 22968\n945 * 445 = 420525\n805 * 252 = 202860\n456 * 301 = 137256\n882 * 262 = 231084\n802 * 573 = 459546\n762 * 97 = 73914\n948 * 886 = 839928\n863 * 506 = 436678\n479 * 188 = 90052\n'
+
 
 def get_output_filename(model, suffix='') -> str:
     """Return a filename for the output data."""
     if suffix != '':
         suffix = f'_{suffix}'
     return f'./data/multiplication_data_{model}_{START_MULTIPLICAND}_{STOP_MULTIPLICAND}{suffix}.csv'
+
 
 class Prompter(ABC):
     """Given numbers to multiply, format them into a prompt."""
@@ -54,6 +57,10 @@ class Answerer(ABC):
     """Answers multiplication prompts."""
 
     @abstractmethod
+    def __repr__(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
     def __call__(self, prompts: list[str]) -> list[str | None]:
         """
         Answer a list of prompt strings, returning a list of answers to each prompt as ints.
@@ -66,13 +73,19 @@ class Answerer(ABC):
 class StubAnswerer(Answerer):
     """Output canned answers for testing."""
 
+    def __repr__(self) -> str:
+        return 'StubAnswerer'
+
     def __call__(self, prompts: list[str]) -> list[str]:
         return ['66'] * len(prompts)
 
 
 class GPT3APIAnswerer(Answerer):
-    def __init__(self, model_name='text-davinci-003'):
+    def __init__(self, model_name):
         self.model_name = model_name
+
+    def __repr__(self) -> str:
+        return f'GPT3-{self.model_name}'
 
     @backoff.on_exception(backoff.expo, RateLimitError)
     def completions_with_backoff(self, **kwargs):
@@ -101,7 +114,7 @@ class GPT3APIAnswerer(Answerer):
 
 
 class HFTransformersAnswerer(Answerer):
-    def __init__(self, model_name='gpt2', batch_size=128):
+    def __init__(self, model_name, batch_size=128):
         self.model_name = model_name
         self.batch_size = batch_size
         self.model = AutoModelForCausalLM.from_pretrained(model_name).to(DEVICE)
@@ -109,6 +122,9 @@ class HFTransformersAnswerer(Answerer):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.eos_token = self.tokenizer('\n').input_ids[0]
         self.tokenizer.pad_token = self.eos_token
+
+    def __repr__(self) -> str:
+        return f'HF-{self.model_name}'
 
     def __call__(self, prompts: list[str]) -> list[str | None]:
         openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -140,32 +156,35 @@ if __name__ == '__main__':
     prompter = FewShotPrompter(FEW_SHOT_PROMPT)
 
     for a in range(START_MULTIPLICAND, STOP_MULTIPLICAND):
-        for b in range(0, a + 1):  # a >= b
+        # for b in range(START_MULTIPLICAND, a + 1):  # a >= b
+        for b in range(START_MULTIPLICAND, STOP_MULTIPLICAND):  # a not necessarily >= b
             multiplicand_tuples.append((a, b))
             prompts.append(prompter(a, b))
 
     # Choose a model with which to answer
-    # answerer = StubAnswerer()
-    # answerer = GPT3APIAnswerer()
-    # answerer = HFTransformersAnswerer()
-    answerer = HFTransformersAnswerer('gpt-2')
-    # answerer = HFTransformersAnswerer('EleutherAI/gpt-j-6B')
-    # answerer = HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16)
+    for answerer in [
+        StubAnswerer(),  # For testing, always outputs a constant
+        HFTransformersAnswerer('gpt2'),  # 117M
+        # HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16), # 1.3B
+        # HFTransformersAnswerer('EleutherAI/gpt-j-6B'),  # 6B, not enough memory on my machine
+        # See https://blog.eleuther.ai/gpt3-model-sizes/ for curie size estimate
+        # GPT3APIAnswerer('text-curie-001'),  # ~6.7B, requires OpenAI API key
+        # GPT3APIAnswerer('text-davinci-003'),  # 175B, requires OpenAI API key
+    ]:
+        # Generate some answers
+        answers = answerer(prompts)
 
-    # Generate some answers
-    answers = answerer(prompts)
+        # Print the results
+        # for multiplicand_tuple, answer in zip(multiplicand_tuples, answers):
+        #     a, b = multiplicand_tuple
+        #     print(f'{a} * {b} = {answer}')
 
-    # Print the results
-    for multiplicand_tuple, answer in zip(multiplicand_tuples, answers):
-        a, b = multiplicand_tuple
-        print(f'{a} * {b} = {answer}')
+        num_answered = len([answer for answer in answers if answer is not None])
+        print(f'Generated {len(prompts)} prompts and successfully got {num_answered} answers.')
 
-    num_answered = len([answer for answer in answers if answer is not None])
-    print(f'Generated {len(prompts)} prompts and successfully got {num_answered} answers.')
-
-    # Write results as CSV
-    with open(get_output_filename(answerer), 'w', newline='\n') as f:
-        writer = csv.writer(f)
-        writer.writerow(['a', 'b', 'completion'])
-        for multiplicand_tuple, answer in zip(multiplicand_tuples, answers):
-            writer.writerow([multiplicand_tuple[0], multiplicand_tuple[1], answer])
+        # Write results as CSV
+        with open(get_output_filename(answerer), 'w', newline='\n') as f:
+            writer = csv.writer(f)
+            writer.writerow(['a', 'b', 'completion'])
+            for multiplicand_tuple, answer in zip(multiplicand_tuples, answers):
+                writer.writerow([multiplicand_tuple[0], multiplicand_tuple[1], answer])
