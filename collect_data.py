@@ -17,7 +17,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 START_MULTIPLICAND = 0
-STOP_MULTIPLICAND = 100
+STOP_MULTIPLICAND = 10
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f'Using device: {DEVICE}')
 
@@ -124,10 +124,11 @@ class HFTransformersAnswerer(Answerer):
         self.tokenizer.pad_token = self.eos_token
 
     def __repr__(self) -> str:
-        return f'HF-{self.model_name}'
+        # Convert / to - to avoid creating a new directory
+        return f'HF-{self.model_name.replace("/", "-")}'
 
     def __call__(self, prompts: list[str]) -> list[str | None]:
-        openai.api_key = os.getenv("OPENAI_API_KEY")
+        openai.api_key = os.getenv('OPENAI_API_KEY')
 
         output = []
         for i in tqdm(range(0, len(prompts), self.batch_size)):
@@ -163,13 +164,15 @@ if __name__ == '__main__':
 
     # Choose a model with which to answer
     for answerer in [
-        StubAnswerer(),  # For testing, always outputs a constant
-        HFTransformersAnswerer('gpt2'),  # 117M
-        # HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16), # 1.3B
+        # StubAnswerer(),  # For testing, always outputs a constant
+        # HFTransformersAnswerer('gpt2'),  # 117M
+        # HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16),  # 1.3B
         # HFTransformersAnswerer('EleutherAI/gpt-j-6B'),  # 6B, not enough memory on my machine
         # See https://blog.eleuther.ai/gpt3-model-sizes/ for curie size estimate
-        # GPT3APIAnswerer('text-curie-001'),  # ~6.7B, requires OpenAI API key
-        # GPT3APIAnswerer('text-davinci-003'),  # 175B, requires OpenAI API key
+        GPT3APIAnswerer('text-ada-001'),  # ~350M
+        # GPT3APIAnswerer('text-babbage-001'),  # ~1.3B
+        # GPT3APIAnswerer('text-curie-001'),  # ~6.7B
+        # GPT3APIAnswerer('text-davinci-003'),  # 175B
     ]:
         # Generate some answers
         answers = answerer(prompts)
@@ -180,7 +183,7 @@ if __name__ == '__main__':
         #     print(f'{a} * {b} = {answer}')
 
         num_answered = len([answer for answer in answers if answer is not None])
-        print(f'Generated {len(prompts)} prompts and successfully got {num_answered} answers.')
+        print(f'{answerer}: Generated {len(prompts)} prompts and successfully got {num_answered} answers.')
 
         # Write results as CSV
         with open(get_output_filename(answerer), 'w', newline='\n') as f:
