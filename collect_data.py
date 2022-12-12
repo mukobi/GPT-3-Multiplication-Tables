@@ -17,12 +17,12 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 START_MULTIPLICAND = 0
-STOP_MULTIPLICAND = 300
+STOP_MULTIPLICAND = 100
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f'Using device: {DEVICE}')
 
 # See ./generate_prompt.py
-FEW_SHOT_PROMPT = 'Multiply:\n319 * 72 = 22968\n945 * 445 = 420525\n805 * 252 = 202860\n456 * 301 = 137256\n882 * 262 = 231084\n802 * 573 = 459546\n762 * 97 = 73914\n948 * 886 = 839928\n863 * 506 = 436678\n479 * 188 = 90052\n'
+FEW_SHOT_PROMPT = 'Multiply:\n14 * 10 = 140\n83 * 29 = 2407\n77 * 63 = 4851\n70 * 19 = 1330\n'
 
 
 def get_output_filename(model, suffix='') -> str:
