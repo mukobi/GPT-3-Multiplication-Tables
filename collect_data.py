@@ -166,9 +166,9 @@ if __name__ == '__main__':
 
     # Choose a model with which to answer
     for answerer in [
-        # StubAnswerer(),  # For testing, always outputs a constant
-        # HFTransformersAnswerer('gpt2'),  # 117M
-        # HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16),  # 1.3B
+        StubAnswerer(),  # For testing, always outputs a constant
+        HFTransformersAnswerer('gpt2'),  # 117M
+        HFTransformersAnswerer('EleutherAI/gpt-neo-1.3B', batch_size=16),  # 1.3B
         # HFTransformersAnswerer('EleutherAI/gpt-j-6B'),  # 6B, not enough memory on my machine
         # See https://blog.eleuther.ai/gpt3-model-sizes/ for curie size estimate
         # GPT3APIAnswerer('text-ada-001'),  # ~350M
